@@ -1,5 +1,5 @@
 # Ultra-minimal Alpine Linux for WebVM with i3
-FROM --platform=i386 i386/alpine:3.22.1
+FROM --platform=i386 i386/alpine:3.19.8
 
 # Install only absolutely essential packages
 RUN apk update && apk add --no-cache \
