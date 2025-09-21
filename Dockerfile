@@ -1,4 +1,4 @@
-FROM docker.io/i386/alpine:3.17
+FROM docker.io/i386/alpine:3.22.1
 # Install required packages
 
 RUN echo -e "\n@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
@@ -16,17 +16,10 @@ RUN sed -i "s/#autologin-user=/autologin-user=user/g" /etc/lightdm/lightdm.conf 
 # Add a script to support display autoresizing
 COPY --chown=user:user ./scripts/99-screen-resize.sh /etc/X11/xinit/xinitrc.d/99-screen-resize.sh
 
-# terminal apps
-RUN apk add vim python3 nodejs gcc nano openssh
-# gui apps
-RUN apk add xpdf rofi gvim gedit xterm pcmanfm feh polybar thunar sgt-puzzles@testing
-
-# the sgt-puzzles package has broken desktop files...
-RUN sed -i 's/Exec=sgt-/Exec=/' /usr/share/applications/sgt-*.desktop
+# minimal apps
+RUN apk add bash emacs nano openssh xterm polybar feh
 
 # config folder
 COPY --chown=user:user ./config /home/user/.config
-# xpdf config goes directly in the home dir
-RUN mv /home/user/.config/.xpdfrc /home/user/
 
 CMD [ "/bin/sh" ]
