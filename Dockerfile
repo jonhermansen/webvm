@@ -1,33 +1,97 @@
-FROM docker.io/i386/alpine:3.17
-# Install required packages
+# Ultra-minimal Alpine Linux for WebVM with i3
+FROM --platform=i386 i386/alpine:3.22.1
 
-RUN echo -e "\n@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-# Default DNS server
-RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
-RUN apk update && apk add alpine-base udev-init-scripts udev-init-scripts-openrc eudev xorg-server xf86-input-libinput lightdm i3wm font-dejavu xrandr xev bash
-# Setup the init script
-RUN rc-update add bootmisc boot && rc-update add udev sysinit && rc-update add udev-trigger sysinit && rc-update add udev-settle sysinit && rc-update add udev-postmount default && rc-update add dbus default && rc-update add lightdm default
-# Add a user
-RUN adduser -D -s /bin/bash user && echo 'user:password' | chpasswd
-# Allow root login
-RUN echo 'root:password' | chpasswd
-# Configure lightdm to start i3
-RUN sed -i "s/#autologin-user=/autologin-user=user/g" /etc/lightdm/lightdm.conf && sed -i "s/#autologin-user-timeout=0/autologin-user-timeout=0/g" /etc/lightdm/lightdm.conf && sed -i "s/#autologin-session=/autologin-session=i3/g" /etc/lightdm/lightdm.conf
-# Add a script to support display autoresizing
-COPY --chown=user:user ./scripts/99-screen-resize.sh /etc/X11/xinit/xinitrc.d/99-screen-resize.sh
+# Install only absolutely essential packages
+RUN apk update && apk add --no-cache \
+    # Core system
+    alpine-base \
+    # X11 minimal (updated package names for 3.22+)
+    xorg-server \
+    xf86-input-libinput \
+    xinit \
+    # Window manager
+    i3wm \
+    dmenu \
+    # Terminal
+    xterm \
+    # Basic utilities
+    bash \
+    nano \
+    # Minimal deps
+    dbus \
+    eudev
 
-# terminal apps
-RUN apk add vim python3 nodejs gcc nano openssh
-# gui apps
-RUN apk add xpdf rofi gvim gedit xterm pcmanfm feh polybar thunar sgt-puzzles@testing
+# Remove unnecessary packages and cache (aggressive cleanup for 3.22.1)
+RUN rm -rf /var/cache/apk/* \
+           /var/lib/apk/lists/* \
+           /usr/share/man/* \
+           /usr/share/doc/* \
+           /usr/share/info/* \
+           /usr/share/locale/* \
+           /usr/lib/gconv/* \
+           /usr/share/i18n/locales/* \
+           /tmp/* \
+           /var/tmp/* \
+    && find /usr/lib -name "*.a" -delete \
+    && find /usr -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
-# the sgt-puzzles package has broken desktop files...
-RUN sed -i 's/Exec=sgt-/Exec=/' /usr/share/applications/sgt-*.desktop
+# Create user
+RUN adduser -D -s /bin/bash user && \
+    echo 'user:password' | chpasswd && \
+    echo 'root:password' | chpasswd
 
-# config folder
-COPY --chown=user:user ./config /home/user/.config
-# xpdf config goes directly in the home dir
-RUN mv /home/user/.config/.xpdfrc /home/user/
+# Minimal i3 configuration
+RUN mkdir -p /home/user/.config/i3 && cat > /home/user/.config/i3/config << 'EOF'
+# WebVM-optimized i3 config
+set $mod Mod4
 
-CMD [ "/bin/sh" ]
+# Font (minimal)
+font pango:monospace 8
 
+# Start terminal
+bindsym $mod+Return exec xterm
+
+# Kill window
+bindsym $mod+Shift+q kill
+
+# Start dmenu
+bindsym $mod+d exec dmenu_run
+
+# Restart i3
+bindsym $mod+Shift+r restart
+
+# Exit i3
+bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -b 'Yes' 'i3-msg exit'"
+
+# Floating mode for all windows (WebVM works better this way)
+for_window [class=".*"] floating enable
+
+# Simple workspace switching
+bindsym $mod+1 workspace 1
+bindsym $mod+2 workspace 2
+
+# Move to workspace
+bindsym $mod+Shift+1 move container to workspace 1
+bindsym $mod+Shift+2 move container to workspace 2
+EOF
+
+# Create .xinitrc
+RUN echo 'exec i3' > /home/user/.xinitrc && \
+    chown -R user:user /home/user
+
+# Create simple startx script
+RUN cat > /usr/local/bin/start-i3 << 'EOF'
+#!/bin/bash
+export DISPLAY=:0
+startx /home/user/.xinitrc
+EOF
+RUN chmod +x /usr/local/bin/start-i3
+
+# Alternative: nano instead of emacs (much lighter, works better in WebVM)
+RUN echo 'export EDITOR=nano' >> /home/user/.bashrc && \
+    echo 'export TERM=xterm' >> /home/user/.bashrc
+
+WORKDIR /home/user
+USER user
+
+CMD ["/bin/bash"]
