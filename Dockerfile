@@ -16,17 +16,11 @@ RUN sed -i "s/#autologin-user=/autologin-user=user/g" /etc/lightdm/lightdm.conf 
 # Add a script to support display autoresizing
 COPY --chown=user:user ./scripts/99-screen-resize.sh /etc/X11/xinit/xinitrc.d/99-screen-resize.sh
 
-# terminal apps
-RUN apk add vim python3 nodejs gcc nano openssh
 # gui apps
-RUN apk add xpdf rofi gvim gedit xterm pcmanfm feh polybar thunar sgt-puzzles@testing
+RUN apk add rofi xterm feh polybar emacs
 
-# the sgt-puzzles package has broken desktop files...
-RUN sed -i 's/Exec=sgt-/Exec=/' /usr/share/applications/sgt-*.desktop
 
 # config folder
 COPY --chown=user:user ./config /home/user/.config
-# xpdf config goes directly in the home dir
-RUN mv /home/user/.config/.xpdfrc /home/user/
 
 CMD [ "/bin/sh" ]
